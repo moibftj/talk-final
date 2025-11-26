@@ -31,3 +31,7 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Core dumps and large files
+core.*
+*.core
