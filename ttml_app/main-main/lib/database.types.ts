@@ -37,16 +37,18 @@ export interface Letter {
   content: string | null
   intake_data: Record<string, any>
   ai_draft_content: string | null
+  admin_edited_content: string | null
   final_content: string | null
+  reviewed_content: string | null
   reviewed_by: string | null
   reviewed_at: string | null
   review_notes: string | null
   rejection_reason: string | null
   approved_at: string | null
-  created_at: string
-  updated_at: string
   completed_at: string | null
   sent_at: string | null
+  created_at: string
+  updated_at: string
   notes: string | null
 }
 
@@ -54,14 +56,21 @@ export interface Subscription {
   id: string
   user_id: string
   plan: string
+  plan_type: string | null
   status: SubscriptionStatus
   price: number
   discount: number
+  discount_percentage: number | null
   coupon_code: string | null
-  employee_id: string | null
+  credits_remaining: number
+  remaining_letters: number
+  last_reset_at: string | null
+  stripe_session_id: string | null
+  stripe_subscription_id: string | null
+  current_period_start: string | null
+  current_period_end: string | null
   created_at: string
   updated_at: string
-  expires_at: string | null
 }
 
 export interface EmployeeCoupon {
@@ -122,9 +131,13 @@ export interface SecurityConfig {
 
 export interface CouponUsage {
   id: string
-  coupon_id: string
   user_id: string
-  subscription_id: string
-  discount_amount: number
+  employee_id: string | null
+  coupon_code: string
+  subscription_id: string | null
+  discount_percent: number
+  amount_before: number
+  amount_after: number
+  discount_applied: number
   created_at: string
 }

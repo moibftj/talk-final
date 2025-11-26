@@ -113,23 +113,33 @@ export default function NewLetterPage() {
         return
       }
 
-      // TASK 3 FIX: Check if user has used free trial
-      const { count: letterCount } = await supabase
+      // =========================================
+      // CRITICAL FIX: Check for Free Trial first
+      // Per architecture: isFreeTrial = (letterCount === 0)
+      // =========================================
+      const { count: letterCount, error: countError } = await supabase
         .from('letters')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-      
-      // Free trial available if no letters yet
-      if (letterCount === 0) {
-        setHasSubscription(true) // Allow free trial
+
+      if (countError) {
+        console.error('Error counting letters:', countError)
+      }
+
+      // If user has no letters, they qualify for FREE TRIAL
+      // This allows them to generate their first letter without a subscription
+      if ((letterCount || 0) === 0) {
+        setHasSubscription(true) // Allow free trial generation
         setIsChecking(false)
         return
       }
 
-      // Otherwise check for paid subscription with credits
+      // =========================================
+      // For users with existing letters, check subscription
+      // =========================================
       const { data: subscriptions, error } = await supabase
         .from('subscriptions')
-        .select('credits_remaining, status')
+        .select('credits_remaining, remaining_letters, status')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -142,7 +152,12 @@ export default function NewLetterPage() {
       }
 
       const subscription = subscriptions?.[0]
-      setHasSubscription(!!(subscription && subscription.credits_remaining > 0))
+      // Check both credit fields for backwards compatibility
+      const hasCredits = subscription && (
+        (subscription.credits_remaining || 0) > 0 || 
+        (subscription.remaining_letters || 0) > 0
+      )
+      setHasSubscription(!!hasCredits)
     } catch (error) {
       console.error('Error checking subscription:', error)
       setHasSubscription(false)

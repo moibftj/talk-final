@@ -18,24 +18,44 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { planType, couponCode } = body
 
+    // =========================================
+    // INPUT VALIDATION
+    // =========================================
+
+    // Validate planType is provided and is a string
+    if (!planType || typeof planType !== 'string') {
+      return NextResponse.json(
+        { error: 'Plan type is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate plan type is one of the allowed values
+    const validPlanTypes = ['one_time', 'standard_4_month', 'premium_8_month']
+    if (!validPlanTypes.includes(planType)) {
+      return NextResponse.json(
+        { error: `Invalid plan type. Must be one of: ${validPlanTypes.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Sanitize coupon code if provided (uppercase, trim, max length)
+    const sanitizedCouponCode = couponCode 
+      ? String(couponCode).toUpperCase().trim().slice(0, 50) 
+      : null
+
     let discount = 0
     let employeeId = null
     let isSuperUserCoupon = false
     let couponId = null
 
-    // TASK 1 FIX: Handle TALK3 special coupon BEFORE database lookup
-    if (couponCode?.toUpperCase() === 'TALK3') {
-      discount = 100 // 100% discount
-      // IMPORTANT: For TALK3, employee still gets 5% commission
-      // We need to find an employee to attribute this to, or handle specially
-      // For now, we'll set employeeId to null but track it differently
-      isSuperUserCoupon = false // TALK3 is NOT a super user coupon
-    } else if (couponCode) {
+    // Handle coupon validation
+    if (sanitizedCouponCode) {
       // Check employee coupons in database (including special promo codes)
       const { data: coupon } = await supabase
         .from('employee_coupons')
         .select('*')
-        .eq('code', couponCode)
+        .eq('code', sanitizedCouponCode)
         .eq('is_active', true)
         .single()
 
@@ -77,7 +97,7 @@ export async function POST(request: NextRequest) {
           status: 'active',
           price: finalPrice,
           discount: discountAmount,
-          coupon_code: couponCode || null,
+          coupon_code: sanitizedCouponCode || null,
           remaining_letters: selectedPlan.letters,
           credits_remaining: selectedPlan.letters,
           last_reset_at: new Date().toISOString(),
@@ -103,12 +123,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (couponCode) {
+      if (sanitizedCouponCode) {
         const { error: usageError } = await supabase
           .from('coupon_usage')
           .insert({
             user_id: user.id,
-            coupon_code: couponCode,
+            coupon_code: sanitizedCouponCode,
             employee_id: employeeId,
             discount_percent: discount,
             amount_before: basePrice,
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // TASK 1 FIX: For TALK3, create commission even though it's 100% discount
+      // For promotional coupons, create commission even though it's 100% discount
       // Employee gets 5% commission on the original price
       if (employeeId && subscription) {
         const commissionAmount = basePrice * 0.05 // 5% of original price
@@ -145,7 +165,7 @@ export async function POST(request: NextRequest) {
         const { data: currentCoupon } = await supabase
           .from('employee_coupons')
           .select('usage_count')
-          .eq('code', couponCode)
+          .eq('code', sanitizedCouponCode)
           .maybeSingle()
 
         const { error: updateError } = await supabase
@@ -154,7 +174,7 @@ export async function POST(request: NextRequest) {
             usage_count: (currentCoupon?.usage_count || 0) + 1,
             updated_at: new Date().toISOString()
           })
-          .eq('code', couponCode)
+          .eq('code', sanitizedCouponCode)
 
         if (updateError) {
           console.error('[Checkout] Coupon update error:', updateError)
@@ -198,7 +218,7 @@ export async function POST(request: NextRequest) {
         base_price: basePrice.toString(),
         discount: discountAmount.toString(),
         final_price: finalPrice.toString(),
-        coupon_code: couponCode || '',
+        coupon_code: sanitizedCouponCode || '',
         employee_id: employeeId || '',
         is_super_user_coupon: isSuperUserCoupon.toString(),
         coupon_id: couponId || ''

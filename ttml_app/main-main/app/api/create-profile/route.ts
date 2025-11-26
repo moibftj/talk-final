@@ -1,36 +1,86 @@
-import { createClient } from "@supabase/supabase-js"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-export async function POST(request: Request) {
+// Initialize Supabase client with service role key for admin operations
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SERVICE_ROLE_KEY!
-    )
+    const body = await request.json()
+    const { userId, email, fullName, role } = body
 
-    const { userId, email, role, fullName } = await request.json()
+    if (!userId || !email) {
+      return NextResponse.json(
+        { error: 'userId and email are required' },
+        { status: 400 }
+      )
+    }
 
-    const { data: profileData, error: profileError } = await supabase
+    const supabase = getSupabaseAdmin()
+
+    // Check if profile already exists
+    const { data: existingProfile } = await supabase
       .from('profiles')
-      .upsert({
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (existingProfile) {
+      return NextResponse.json({
+        success: true,
+        message: 'Profile already exists',
+        profileId: existingProfile.id
+      })
+    }
+
+    // Create new profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .insert({
         id: userId,
         email: email,
-        role: role,
-        full_name: fullName
-      }, {
-        onConflict: 'id'
+        full_name: fullName || null,
+        role: role || 'subscriber',
+        is_super_user: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .select()
       .single()
 
     if (profileError) {
-      console.error('Profile creation error:', profileError)
-      return NextResponse.json({ error: profileError }, { status: 500 })
+      console.error('[CreateProfile] Error creating profile:', profileError)
+      throw profileError
     }
 
-    return NextResponse.json({ success: true, profile: profileData })
+    return NextResponse.json({
+      success: true,
+      message: 'Profile created successfully',
+      profileId: profile.id
+    })
+
   } catch (error: any) {
-    console.error('Unexpected error during profile creation:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[CreateProfile] Error:', error)
+    return NextResponse.json(
+      {
+        error: 'Failed to create profile',
+        details: error.message || 'Unknown error'
+      },
+      { status: 500 }
+    )
   }
 }

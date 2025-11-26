@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminCredentials, createAdminSession } from '@/lib/auth/admin-session'
+import { verifyAdminCredentials, createAdminSession, isAdminConfigured } from '@/lib/auth/admin-session'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
-    // TASK 5 FIX: Add explicit validation for admin credentials
-    if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.ADMIN_PORTAL_KEY) {
-      console.error('[CRITICAL] Admin credentials not configured!')
+    // Check if admin is configured
+    if (!isAdminConfigured()) {
+      console.error('[CRITICAL] Admin credentials not configured in environment variables')
       return NextResponse.json(
-        { 
-          error: 'Admin system not configured',
-          details: 'Admin credentials are missing. Please configure ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_PORTAL_KEY environment variables.'
-        },
-        { status: 500 }
+        { error: 'Admin system not configured. Please contact support.' },
+        { status: 503 }
       )
     }
 

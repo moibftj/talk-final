@@ -5,6 +5,31 @@ import { NextRequest, NextResponse } from 'next/server'
 const ADMIN_SESSION_COOKIE = 'admin_session'
 const ADMIN_SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes in milliseconds
 
+// =========================================
+// Validate admin configuration on module load
+// =========================================
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  
+const ADMIN_PORTAL_KEY = process.env.ADMIN_PORTAL_KEY
+
+// Log warning if admin credentials not configured
+if (typeof window === 'undefined') { // Server-side only
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || !ADMIN_PORTAL_KEY) {
+    console.warn('[SECURITY] Admin credentials not fully configured. Admin portal may be disabled.')
+  }
+}
+
+/**
+ * Check if admin authentication is properly configured
+ */
+export function isAdminConfigured(): boolean {
+  return !!(
+    process.env.ADMIN_EMAIL && 
+    process.env.ADMIN_PASSWORD && 
+    process.env.ADMIN_PORTAL_KEY
+  )
+}
+
 export interface AdminSession {
   userId: string
   email: string

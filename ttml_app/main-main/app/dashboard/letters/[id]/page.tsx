@@ -45,16 +45,21 @@ export default async function LetterDetailPage({ params }: { params: { id: strin
       label: 'Under Attorney Review',
       status: ['pending_review', 'under_review'].includes(letter.status) 
         ? 'active' 
-        : (['approved', 'rejected'].includes(letter.status) ? 'completed' : 'pending'),
-      icon: ['pending_review', 'under_review'].includes(letter.status) ? '⏳' : '✓',
+        : (['approved', 'rejected', 'completed'].includes(letter.status) ? 'completed' : 'pending'),
+      icon: ['pending_review', 'under_review'].includes(letter.status) ? '⏳' : 
+            (['approved', 'rejected', 'completed'].includes(letter.status) ? '✓' : '○'),
       description: letter.status === 'under_review' 
         ? 'Attorney is currently reviewing your letter' 
-        : (letter.status === 'pending_review' ? 'Waiting for attorney review' : 'Review completed')
+        : (letter.status === 'pending_review' 
+          ? 'Waiting for attorney review' 
+          : (['approved', 'completed'].includes(letter.status) 
+            ? 'Review completed' 
+            : 'Pending'))
     },
     {
       label: letter.status === 'rejected' ? 'Rejected' : 'Approved',
-      status: ['approved', 'rejected'].includes(letter.status) ? 'completed' : 'pending',
-      icon: letter.status === 'approved' ? '✓' : (letter.status === 'rejected' ? '✗' : '○'),
+      status: ['approved', 'rejected', 'completed'].includes(letter.status) ? 'completed' : 'pending',
+      icon: ['approved', 'completed'].includes(letter.status) ? '✓' : (letter.status === 'rejected' ? '✗' : '○'),
       description: letter.approved_at 
         ? format(new Date(letter.approved_at), 'MMM d, yyyy h:mm a')
         : (letter.reviewed_at && letter.status === 'rejected' 
@@ -63,9 +68,11 @@ export default async function LetterDetailPage({ params }: { params: { id: strin
     },
     {
       label: 'Letter Ready',
-      status: letter.status === 'approved' ? 'completed' : 'pending',
-      icon: letter.status === 'approved' ? '✓' : '○',
-      description: letter.status === 'approved' ? 'Ready to download and email' : 'Waiting for approval'
+      status: ['approved', 'completed'].includes(letter.status) ? 'completed' : 'pending',
+      icon: ['approved', 'completed'].includes(letter.status) ? '✓' : '○',
+      description: ['approved', 'completed'].includes(letter.status) 
+        ? 'Ready to download and email' 
+        : 'Waiting for approval'
     }
   ]
 
@@ -174,34 +181,59 @@ export default async function LetterDetailPage({ params }: { params: { id: strin
             </div>
           )}
 
-          {/* TASK 4 FIX: Hide AI draft before approval */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Letter Content</h2>
-              <span className="text-xs text-muted-foreground">
-                {letter.status === 'approved' ? 'Approved and ready' : 'Under review'}
-              </span>
-            </div>
-            <div className="bg-muted/50 border rounded-lg p-4">
-              {letter.status === 'approved' ? (
-                letter.final_content ? (
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed">{letter.final_content}</pre>
-                ) : letter.ai_draft_content ? (
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed">{letter.ai_draft_content}</pre>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No content available.</p>
-                )
-              ) : (
-                <div className="text-muted-foreground text-sm py-8 text-center">
-                  <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <p className="font-medium">Your letter is under review</p>
-                  <p className="text-xs mt-1">Content will be available once approved by our legal team</p>
+          {/* Letter Content Section */}
+          {['approved', 'completed'].includes(letter.status) ? (
+            <>
+              {/* Show Final/Approved Content */}
+              <div className="bg-white rounded-lg shadow-sm border p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Your Approved Letter</h2>
+                  <span className="text-xs text-primary font-medium capitalize">
+                    {letter.status === 'completed' ? 'Completed' : 'Approved'}
+                  </span>
+                </div>
+                <div className="bg-muted/50 border rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {/* Priority: admin_edited_content > final_content > ai_draft_content */}
+                    {letter.admin_edited_content || letter.final_content || letter.ai_draft_content || 'No content available.'}
+                  </pre>
+                </div>
+              </div>
+              
+              {/* Show review notes if any */}
+              {letter.review_notes && (
+                <div className="bg-muted/30 border rounded-lg p-4 mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Attorney Notes</h3>
+                  <p className="text-sm">{letter.review_notes}</p>
                 </div>
               )}
+            </>
+          ) : (
+            /* Before approval - show placeholder message */
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Letter Content</h2>
+                <span className="text-xs text-muted-foreground capitalize">
+                  {letter.status.replace('_', ' ')}
+                </span>
+              </div>
+              <div className="bg-muted/30 border border-dashed rounded-lg p-8 text-center">
+                <svg className="w-12 h-12 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="font-medium text-foreground mb-2">Content Under Review</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  {letter.status === 'generating' 
+                    ? 'Your letter is being generated. This may take a moment...'
+                    : letter.status === 'under_review'
+                      ? 'An attorney is currently reviewing your letter.'
+                      : letter.status === 'rejected'
+                        ? 'Your letter was rejected. Please check the rejection reason below.'
+                        : 'Your letter is in the review queue. Content will be available once approved.'}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
